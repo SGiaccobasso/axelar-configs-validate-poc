@@ -140,9 +140,7 @@ function exitWitheError(errorMessage: string) {
  */
 async function validateTokenInfo(
   tokenInfo: Record<string, TokenInfo>
-): Promise<string[]> {
-  const errors: string[] = [];
-
+): Promise<void> {
   for (const [tokenId, info] of Object.entries(tokenInfo)) {
     console.log(`\nValidating token: ${tokenId}`);
     try {
@@ -156,7 +154,6 @@ async function validateTokenInfo(
       exitWitheError((error as Error).message);
     }
   }
-  return errors;
 }
 
 async function validateTokenId(
