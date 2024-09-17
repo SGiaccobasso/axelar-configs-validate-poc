@@ -232,7 +232,7 @@ async function validateChains(tokenId: string, info: TokenInfo): Promise<void> {
 }
 
 async function validateTokenAddress(
-  chain: any,
+  chain: ChainInfo,
   provider: ethers.JsonRpcProvider
 ): Promise<void> {
   const tokenCode = await provider.getCode(chain.tokenAddress);
@@ -243,7 +243,7 @@ async function validateTokenAddress(
 }
 
 async function validateTokenDetails(
-  chain: any,
+  chain: ChainInfo,
   info: TokenInfo,
   provider: ethers.JsonRpcProvider
 ): Promise<void> {
@@ -278,7 +278,7 @@ async function validateTokenDetails(
 }
 
 async function validateTokenManager(
-  chain: any,
+  chain: ChainInfo,
   provider: ethers.JsonRpcProvider
 ): Promise<void> {
   const managerCode = await provider.getCode(chain.tokenManager);
@@ -329,11 +329,10 @@ async function validateInterchainTokenId(
   info: TokenInfo
 ): Promise<void> {
   const rpcUrl = await getRpcUrl(info.originAxelarChainId);
-  if (!rpcUrl) {
+  if (!rpcUrl)
     throw new Error(
       `No RPC URL found for origin chain ${info.originAxelarChainId}`
     );
-  }
 
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   const itsContract = new ethers.Contract(ITSAddress, ITSABI, provider);
