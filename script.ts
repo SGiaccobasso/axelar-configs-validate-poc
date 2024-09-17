@@ -33,7 +33,6 @@ interface TokenInfo {
 type TokenManagerType = (typeof tokenManagerTypes)[number];
 
 // Constants
-
 const tokenManagerTypes = [
   "nativeInterchainToken",
   "mintBurnFrom",
@@ -44,6 +43,7 @@ const tokenManagerTypes = [
 ] as const;
 const ITSAddress = "0xB5FB4BE02232B1bBA4dC8f81dc24C26980dE9e3C";
 const COINGECKO_API_KEY = "CG-3VGxh1K3Qk7jAvpt4DJA3LvB";
+const COINGECKO_URL = "https://api.coingecko.com/api/v3/coins/";
 const CHAIN_CONFIGS_URL =
   "https://axelar-mainnet.s3.us-east-2.amazonaws.com/configs/mainnet-config-1.x.json";
 const ERC20ABI = [
@@ -146,7 +146,7 @@ async function validateTokenInfo(
     try {
       await validateTokenId(tokenId, info);
       await validateCoinGeckoId(tokenId, info);
-      await validateChains(tokenId, info);
+      await validateChains(info);
       await validateOriginChain(info);
       await validateDeployerAndSalt(tokenId, info);
     } catch (error) {
@@ -166,20 +166,17 @@ async function validateTokenId(
 
 async function validateCoinGeckoId(
   tokenId: string,
-  info: TokenInfo
+  { coinGeckoId, prettySymbol }: TokenInfo
 ): Promise<void> {
-  if (!info.coinGeckoId)
+  if (!coinGeckoId)
     throw new Error(`CoinGecko ID is missing for token ${tokenId}`);
 
   try {
-    const response = await axios.get(
-      `https://api.coingecko.com/api/v3/coins/${info.coinGeckoId}`,
-      {
-        headers: {
-          "x-cg-demo-api-key": COINGECKO_API_KEY,
-        },
-      }
-    );
+    const response = await axios.get(COINGECKO_URL + coinGeckoId, {
+      headers: {
+        "x-cg-demo-api-key": COINGECKO_API_KEY,
+      },
+    });
 
     if (response.status !== 200)
       throw new Error(
@@ -187,15 +184,15 @@ async function validateCoinGeckoId(
       );
 
     const coinData = response.data;
-    if (coinData.symbol.toLowerCase() !== info.prettySymbol.toLowerCase()) {
+    if (coinData.symbol.toLowerCase() !== prettySymbol.toLowerCase()) {
       throw new Error(
-        `CoinGecko symbol (${coinData.symbol}) does not match prettySymbol (${info.prettySymbol}) for token ${tokenId}`
+        `CoinGecko symbol (${coinData.symbol}) does not match prettySymbol (${prettySymbol}) for token ${tokenId}`
       );
     }
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
       throw new Error(
-        `CoinGecko ID ${info.coinGeckoId} not found for token ${tokenId}`
+        `CoinGecko ID ${coinGeckoId} not found for token ${tokenId}`
       );
     }
     throw new Error(
@@ -206,14 +203,13 @@ async function validateCoinGeckoId(
   }
 }
 
-async function validateChains(tokenId: string, info: TokenInfo): Promise<void> {
+async function validateChains(info: TokenInfo): Promise<void> {
   for (const chain of info.chains) {
     console.log(`Validating chain: ${chain.axelarChainId}`);
 
     const rpcUrl = await getRpcUrl(chain.axelarChainId);
-    if (!rpcUrl) {
+    if (!rpcUrl)
       throw new Error(`No RPC URL found for chain ${chain.axelarChainId}`);
-    }
 
     const provider = new ethers.JsonRpcProvider(rpcUrl);
 
@@ -236,7 +232,7 @@ async function validateTokenAddress(
 
 async function validateTokenDetails(
   chain: ChainInfo,
-  info: TokenInfo,
+  { originAxelarChainId, prettySymbol, decimals }: TokenInfo,
   provider: ethers.JsonRpcProvider
 ): Promise<void> {
   const tokenContract = new ethers.Contract(
@@ -257,14 +253,14 @@ async function validateTokenDetails(
     throw new Error(
       `Token symbol mismatch on chain ${chain.axelarChainId}: expected ${chain.symbol}, got ${tokenSymbol}`
     );
-  if (info.originAxelarChainId === chain.axelarChainId) {
-    if (tokenSymbol.toLowerCase() !== info.prettySymbol.toLowerCase())
+  if (originAxelarChainId === chain.axelarChainId) {
+    if (tokenSymbol.toLowerCase() !== prettySymbol.toLowerCase())
       throw new Error(
-        `Token symbol mismatch on chain ${chain.axelarChainId}: expected ${info.prettySymbol}, got ${tokenSymbol}`
+        `Token symbol mismatch on chain ${chain.axelarChainId}: expected ${prettySymbol}, got ${tokenSymbol}`
       );
-    if (decimalsFromContract !== info.decimals)
+    if (decimalsFromContract !== decimals)
       throw new Error(
-        `Token decimals mismatch on chain ${chain.axelarChainId}: expected ${info.decimals}, got ${decimalsFromContract}`
+        `Token decimals mismatch on chain ${chain.axelarChainId}: expected ${decimals}, got ${decimalsFromContract}`
       );
   }
 }
@@ -305,36 +301,36 @@ async function validateTokenManager(
     );
 }
 
-async function validateOriginChain(info: TokenInfo): Promise<void> {
-  const originChain = info.chains.find(
-    (chain) => chain.axelarChainId === info.originAxelarChainId
+async function validateOriginChain({
+  chains,
+  originAxelarChainId,
+}: TokenInfo): Promise<void> {
+  const originChain = chains.find(
+    (chain) => chain.axelarChainId === originAxelarChainId
   );
-  if (!originChain) {
+  if (!originChain)
     throw new Error(
-      `Origin chain ${info.originAxelarChainId} not found in chains list`
+      `Origin chain ${originAxelarChainId} not found in chains list`
     );
-  }
 }
 
 async function validateDeployerAndSalt(
   tokenId: string,
-  info: TokenInfo
+  { originAxelarChainId, deployer, deploySalt }: TokenInfo
 ): Promise<void> {
-  const rpcUrl = await getRpcUrl(info.originAxelarChainId);
+  const rpcUrl = await getRpcUrl(originAxelarChainId);
   if (!rpcUrl)
-    throw new Error(
-      `No RPC URL found for origin chain ${info.originAxelarChainId}`
-    );
+    throw new Error(`No RPC URL found for origin chain ${originAxelarChainId}`);
 
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   const itsContract = new ethers.Contract(ITSAddress, ITSABI, provider);
 
-  if (!ethers.isAddress(info.deployer))
-    throw new Error(`Invalid deployer address: ${info.deployer}`);
+  if (!ethers.isAddress(deployer))
+    throw new Error(`Invalid deployer address: ${deployer}`);
 
   const calculatedTokenId = await itsContract.interchainTokenId(
-    info.deployer,
-    info.deploySalt
+    deployer,
+    deploySalt
   );
 
   if (calculatedTokenId.toLowerCase() !== tokenId.toLowerCase())
@@ -343,8 +339,8 @@ async function validateDeployerAndSalt(
         `Deployer or Deploy Salt could be incorrect\n` +
         `  Expected:   ${tokenId}\n` +
         `  Calculated: ${calculatedTokenId}\n` +
-        `  Deployer:   ${info.deployer}\n` +
-        `  Deploy Salt: ${info.deploySalt}`
+        `  Deployer:   ${deployer}\n` +
+        `  Deploy Salt: ${deploySalt}`
     );
 }
 
@@ -358,6 +354,7 @@ async function main() {
   } catch (error) {
     exitWitheError((error as Error).message);
   }
+  console.log("Validation successful!");
 }
 
 main();
