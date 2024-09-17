@@ -115,13 +115,13 @@ async function getAxelarChains() {
   return data.chains;
 }
 
-async function getRpcUrl(axelarChainId: string): Promise<string | null> {
+async function getRpcUrl(axelarChainId: string): Promise<string> {
   try {
     const chains = await getAxelarChains();
     return chains[axelarChainId].config.rpc[0];
   } catch (error) {
     throw new Error(
-      `Error fetching chain configs for chain '${axelarChainId}': ${
+      `Error fetching chain configs for chain '${axelarChainId}':\n ${
         (error as Error).message
       }`
     );
@@ -209,9 +209,6 @@ async function validateChains(info: TokenInfo): Promise<void> {
     console.log(`Validating for ${chain.axelarChainId}...`);
 
     const rpcUrl = await getRpcUrl(chain.axelarChainId);
-    if (!rpcUrl)
-      throw new Error(`No RPC URL found for chain ${chain.axelarChainId}`);
-
     const provider = new ethers.JsonRpcProvider(rpcUrl);
 
     await validateTokenAddress(chain, provider);
@@ -320,9 +317,6 @@ async function validateDeployerAndSalt(
   { originAxelarChainId, deployer, deploySalt }: TokenInfo
 ): Promise<void> {
   const rpcUrl = await getRpcUrl(originAxelarChainId);
-  if (!rpcUrl)
-    throw new Error(`No RPC URL found for origin chain ${originAxelarChainId}`);
-
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   const itsContract = new ethers.Contract(ITSAddress, ITSABI, provider);
 
