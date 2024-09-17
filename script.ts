@@ -1,52 +1,18 @@
 import fs from "fs";
 import { ethers } from "ethers";
-import {
-  arbitrum,
-  aurora,
-  avalanche,
-  base,
-  blast,
-  bsc,
-  celo,
-  fantom,
-  filecoin,
-  fraxtal,
-  immutableZkEvm,
-  kava,
-  linea,
-  mainnet,
-  mantle,
-  moonbeam,
-  optimism,
-  polygon,
-  polygonZkEvm,
-  scroll,
-  Chain,
-} from "viem/chains";
 import axios from "axios";
-import { Address, isAddress } from "viem";
-
 /*
  * =============================
  * Section: Types and Constants
  * =============================
  */
-
-interface ExtendedChain extends Chain {
-  axelarChainId: string;
-  axelarChainName: string;
-  rpcUrls: {
-    default: { http: string[] };
-    public: { http: string[] };
-  };
-}
 interface ChainInfo {
   symbol: string;
   name: string;
   axelarChainId: string;
   tokenAddress: string;
   tokenManager: string;
-  tokenManagerType: string;
+  tokenManagerType: TokenManagerType;
 }
 interface TokenInfo {
   tokenId: string;
@@ -64,145 +30,19 @@ interface TokenInfo {
   coinGeckoId: string;
   chains: ChainInfo[];
 }
-const tokenManagerTypeMapping: Record<string, number> = {
-  nativeInterchainToken: 0,
-  mintBurnFrom: 1,
-  lockUnlock: 2,
-  lockUnlockFee: 3,
-  mintBurn: 4,
-  gateway: 5,
-};
-// Reverse mapping
-const tokenManagerTypeReverseMapping: Record<number, string> =
-  Object.fromEntries(
-    Object.entries(tokenManagerTypeMapping).map(([key, value]) => [value, key])
-  );
+type TokenManagerType = (typeof tokenManagerTypes)[number];
+// Constants
+const tokenManagerTypes = [
+  "nativeInterchainToken",
+  "mintBurnFrom",
+  "lockUnlock",
+  "lockUnlockFee",
+  "mintBurn",
+  "gateway",
+] as const;
 const ITSAddress = "0xB5FB4BE02232B1bBA4dC8f81dc24C26980dE9e3C";
-const mainnetChains = [
-  {
-    ...mainnet,
-    rpcUrls: createRpcUrlConfig(mainnet, ["https://eth.llamarpc.com"]),
-    axelarChainId: "ethereum",
-    axelarChainName: "ethereum",
-  },
-  {
-    ...moonbeam,
-    rpcUrls: createRpcUrlConfig(moonbeam, ["https://moonbeam.drpc.org"]),
-    axelarChainId: "moonbeam",
-    axelarChainName: "Moonbeam",
-  },
-  {
-    ...fantom,
-    rpcUrls: createRpcUrlConfig(fantom, ["https://fantom.drpc.org"]),
-    axelarChainId: "fantom",
-    axelarChainName: "Fantom",
-  },
-  {
-    ...immutableZkEvm,
-    rpcUrls: createRpcUrlConfig(immutableZkEvm, [
-      "https://immutable-zkevm.drpc.org",
-    ]),
-    axelarChainId: "immutable",
-    axelarChainName: "Immutable",
-  },
-  {
-    ...avalanche,
-    rpcUrls: createRpcUrlConfig(avalanche, ["https://1rpc.io/avax/c"]),
-    axelarChainId: "avalanche",
-    axelarChainName: "Avalanche",
-  },
-  {
-    ...polygon,
-    rpcUrls: createRpcUrlConfig(polygon, ["https://polygon.llamarpc.com"]),
-    axelarChainId: "polygon",
-    axelarChainName: "Polygon",
-  },
-  {
-    ...polygonZkEvm,
-    rpcUrls: createRpcUrlConfig(polygonZkEvm, [
-      "https://polygon-zkevm.drpc.org",
-    ]),
-    axelarChainId: "polygon-zkevm",
-    axelarChainName: "polygon-zkevm",
-  },
-  {
-    ...bsc,
-    rpcUrls: createRpcUrlConfig(bsc, ["https://binance.llamarpc.com"]),
-    axelarChainId: "binance",
-    axelarChainName: "binance",
-  },
-  {
-    ...arbitrum,
-    rpcUrls: createRpcUrlConfig(arbitrum, ["https://arbitrum.drpc.org"]),
-    axelarChainId: "arbitrum",
-    axelarChainName: "arbitrum",
-  },
-  {
-    ...celo,
-    rpcUrls: createRpcUrlConfig(celo, ["https://1rpc.io/celo"]),
-    axelarChainId: "celo",
-    axelarChainName: "celo",
-  },
-  {
-    ...aurora,
-    rpcUrls: createRpcUrlConfig(aurora, ["https://1rpc.io/aurora"]),
-    axelarChainId: "aurora",
-    axelarChainName: "aurora",
-  },
-  {
-    ...optimism,
-    axelarChainId: "optimism",
-    axelarChainName: "optimism",
-  },
-  {
-    ...kava,
-    rpcUrls: createRpcUrlConfig(kava, ["https://kava.drpc.org"]),
-    axelarChainId: "kava",
-    axelarChainName: "kava",
-  },
-  {
-    ...filecoin,
-    rpcUrls: createRpcUrlConfig(filecoin, ["https://rpc.ankr.com/filecoin"]),
-    axelarChainId: "filecoin",
-    axelarChainName: "filecoin",
-  },
-  {
-    ...base,
-    rpcUrls: createRpcUrlConfig(base, ["https://base.llamarpc.com"]),
-    axelarChainId: "base",
-    axelarChainName: "base",
-  },
-  {
-    ...linea,
-    rpcUrls: createRpcUrlConfig(linea, ["https://1rpc.io/linea"]),
-    axelarChainId: "linea",
-    axelarChainName: "linea",
-  },
-  {
-    ...mantle,
-    rpcUrls: createRpcUrlConfig(mantle, ["https://rpc.mantle.xyz"]),
-    axelarChainId: "mantle",
-    axelarChainName: "mantle",
-  },
-  {
-    ...scroll,
-    rpcUrls: createRpcUrlConfig(scroll, ["https://scroll.drpc.org"]),
-    axelarChainId: "scroll",
-    axelarChainName: "scroll",
-  },
-  {
-    ...fraxtal,
-    rpcUrls: createRpcUrlConfig(fraxtal, ["https://fraxtal.drpc.org"]),
-    axelarChainId: "fraxtal",
-    axelarChainName: "fraxtal",
-  },
-  {
-    ...blast,
-    rpcUrls: createRpcUrlConfig(blast, ["https://rpc.envelop.is/blast"]),
-    axelarChainId: "blast",
-    axelarChainName: "blast",
-  },
-];
+const CHAIN_CONFIGS_URL =
+  "https://axelar-mainnet.s3.us-east-2.amazonaws.com/configs/mainnet-config-1.x.json";
 const ERC20ABI = [
   {
     constant: true,
@@ -266,23 +106,14 @@ const tokenManagerABI = [
  * Section: Helper Functions
  * =============================
  */
-
-function createRpcUrlConfig(
-  chain: Chain,
-  additionalUrls: string[]
-): ExtendedChain["rpcUrls"] {
-  const httpUrls = [...chain.rpcUrls.default.http, ...additionalUrls];
-  return {
-    default: { http: httpUrls },
-    public: { http: httpUrls },
-  };
+async function getAxelarChains() {
+  const { data } = await axios.get(CHAIN_CONFIGS_URL);
+  return data.chains;
 }
 
-function getRpcUrl(axelarChainId: string): string | null {
-  const chainConfig = mainnetChains.find(
-    (chain) => chain.axelarChainId === axelarChainId
-  );
-  return chainConfig ? chainConfig.rpcUrls.default.http[0] : null;
+async function getRpcUrl(axelarChainId: string): Promise<string | null> {
+  const chains = await getAxelarChains();
+  return chains[axelarChainId].config.rpc[0];
 }
 
 /*
@@ -357,7 +188,7 @@ async function validateTokenInfo(
       console.log(`Validating chain: ${chain.axelarChainId}`);
 
       // Create provider
-      const rpcUrl = getRpcUrl(chain.axelarChainId);
+      const rpcUrl = await getRpcUrl(chain.axelarChainId);
       if (!rpcUrl) {
         errors.push(`No RPC URL found for chain ${chain.axelarChainId}`);
         continue;
@@ -443,13 +274,12 @@ async function validateTokenInfo(
             await tokenManagerContract.implementationType();
           if (
             Number(implementationType) !==
-            tokenManagerTypeMapping[chain.tokenManagerType]
+            tokenManagerTypes.indexOf(chain.tokenManagerType)
           ) {
             errors.push(
               `Token manager on chain ${chain.axelarChainId} has incorrect implementation type: ` +
                 `expected ${
-                  tokenManagerTypeReverseMapping[Number(implementationType)] ||
-                  "Unknown"
+                  tokenManagerTypes[Number(implementationType)] || "Unknown"
                 }, ` +
                 `got ${chain.tokenManagerType}`
             );
@@ -476,7 +306,7 @@ async function validateTokenInfo(
 
     // Validate interchainTokenId with deployer and salt
     if (originChain) {
-      const rpcUrl = getRpcUrl(info.originAxelarChainId);
+      const rpcUrl = await getRpcUrl(info.originAxelarChainId);
       if (!rpcUrl) {
         errors.push(
           `No RPC URL found for origin chain ${info.originAxelarChainId}`
