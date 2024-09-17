@@ -146,10 +146,9 @@ async function validateTokenInfo(
     try {
       await validateTokenId(tokenId, info);
       await validateCoinGeckoId(tokenId, info);
-      await validateDeployerAddress(info);
       await validateChains(tokenId, info);
       await validateOriginChain(info);
-      await validateInterchainTokenId(tokenId, info);
+      await validateDeployerAndSalt(tokenId, info);
     } catch (error) {
       exitWitheError((error as Error).message);
     }
@@ -169,9 +168,8 @@ async function validateCoinGeckoId(
   tokenId: string,
   info: TokenInfo
 ): Promise<void> {
-  if (!info.coinGeckoId) {
+  if (!info.coinGeckoId)
     throw new Error(`CoinGecko ID is missing for token ${tokenId}`);
-  }
 
   try {
     const response = await axios.get(
@@ -205,12 +203,6 @@ async function validateCoinGeckoId(
         (error as Error).message
       }`
     );
-  }
-}
-
-async function validateDeployerAddress(info: TokenInfo): Promise<void> {
-  if (!ethers.isAddress(info.deployer)) {
-    throw new Error(`Invalid deployer address: ${info.deployer}`);
   }
 }
 
@@ -324,7 +316,7 @@ async function validateOriginChain(info: TokenInfo): Promise<void> {
   }
 }
 
-async function validateInterchainTokenId(
+async function validateDeployerAndSalt(
   tokenId: string,
   info: TokenInfo
 ): Promise<void> {
@@ -336,6 +328,9 @@ async function validateInterchainTokenId(
 
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   const itsContract = new ethers.Contract(ITSAddress, ITSABI, provider);
+
+  if (!ethers.isAddress(info.deployer))
+    throw new Error(`Invalid deployer address: ${info.deployer}`);
 
   const calculatedTokenId = await itsContract.interchainTokenId(
     info.deployer,
