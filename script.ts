@@ -42,6 +42,7 @@ const tokenManagerTypes = [
   "gateway",
 ] as const;
 const ITSAddress = "0xB5FB4BE02232B1bBA4dC8f81dc24C26980dE9e3C";
+const TOKEN_FILE_ROUTE = "./new_tokens.json";
 const COINGECKO_API_KEY = "CG-3VGxh1K3Qk7jAvpt4DJA3LvB";
 const COINGECKO_URL = "https://api.coingecko.com/api/v3/coins/";
 const CHAIN_CONFIGS_URL =
@@ -142,7 +143,7 @@ async function validateTokenInfo(
   tokenInfo: Record<string, TokenInfo>
 ): Promise<void> {
   for (const [tokenId, info] of Object.entries(tokenInfo)) {
-    console.log(`\nValidating token: ${tokenId}`);
+    console.log(`\nValidating token: ${tokenId}...`);
     try {
       await validateTokenId(tokenId, info);
       await validateCoinGeckoId(tokenId, info);
@@ -205,7 +206,7 @@ async function validateCoinGeckoId(
 
 async function validateChains(info: TokenInfo): Promise<void> {
   for (const chain of info.chains) {
-    console.log(`Validating chain: ${chain.axelarChainId}`);
+    console.log(`Validating for ${chain.axelarChainId}...`);
 
     const rpcUrl = await getRpcUrl(chain.axelarChainId);
     if (!rpcUrl)
@@ -348,7 +349,7 @@ async function main() {
   try {
     // Read new token configurations from file
     const newTokens: Record<string, TokenInfo> = JSON.parse(
-      fs.readFileSync("./new_tokens.json", "utf8")
+      fs.readFileSync(TOKEN_FILE_ROUTE, "utf8")
     );
     await validateTokenInfo(newTokens);
   } catch (error) {
