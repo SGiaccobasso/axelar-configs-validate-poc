@@ -136,7 +136,7 @@ function exitWitheError(errorMessage: string) {
 
 /*
  * =============================
- * Section: Main Functions
+ * Section: Validation Functions
  * =============================
  */
 async function validateTokenInfo(
@@ -339,6 +339,11 @@ async function validateDeployerAndSalt(
     );
 }
 
+/*
+ * =============================
+ * Section: Main
+ * =============================
+ */
 async function main() {
   try {
     // Read new token configurations from file
